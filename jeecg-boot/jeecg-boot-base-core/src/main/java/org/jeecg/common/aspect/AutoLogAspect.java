@@ -1,8 +1,10 @@
 package org.jeecg.common.aspect;
 
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.PropertyFilter;
-import org.jeecg.common.util.LoginUserUtils;
+import lombok.RequiredArgsConstructor;
+import org.jeecg.common.util.*;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -17,9 +19,6 @@ import org.jeecg.common.constant.enums.ModuleType;
 import org.jeecg.common.constant.enums.OperateTypeEnum;
 import org.jeecg.modules.base.service.BaseCommonService;
 import org.jeecg.common.system.vo.LoginUser;
-import org.jeecg.common.util.IpUtils;
-import org.jeecg.common.util.SpringContextUtils;
-import org.jeecg.common.util.oConvertUtils;
 import org.springframework.core.StandardReflectionParameterNameDiscoverer;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
@@ -41,7 +40,10 @@ import java.util.Date;
  */
 @Aspect
 @Component
+@RequiredArgsConstructor
 public class AutoLogAspect {
+
+	private final SpelUtil spelUtil;
 
     @Resource
     private BaseCommonService baseCommonService;
@@ -72,11 +74,23 @@ public class AutoLogAspect {
         LogDTO dto = new LogDTO();
         AutoLog syslog = method.getAnnotation(AutoLog.class);
         if(syslog != null){
-            //update-begin-author:taoyan date:
-            String content = syslog.value();
-            if(syslog.module()== ModuleType.ONLINE){
-                content = getOnlineLogContent(obj, content);
-            }
+	        String content;
+	        String el = syslog.el();
+			if(StrUtil.isNotBlank(el)){
+				content = spelUtil.eval(
+					el,
+					joinPoint.getTarget(),
+					method,
+					joinPoint.getArgs(),
+					obj,
+					String.class
+				);
+			}else{
+				content = syslog.value();
+	            if(syslog.module()== ModuleType.ONLINE){
+	                content = getOnlineLogContent(obj, content);
+	            }
+			}
             //注解上的描述,操作日志内容
             dto.setLogType(syslog.logType());
             dto.setLogContent(content);

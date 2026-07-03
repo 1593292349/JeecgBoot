@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.Feature;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -11,9 +12,12 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.jeecg.common.api.CommonAPI;
 import org.jeecg.common.api.vo.Result;
+import org.jeecg.common.aspect.annotation.AutoDict;
 import org.jeecg.common.aspect.annotation.Dict;
+import org.jeecg.common.aspect.annotation.NestedDict;
 import org.jeecg.common.constant.CommonConstant;
 import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.common.util.oConvertUtils;
@@ -60,12 +64,14 @@ public class DictAspect {
 
     @Around("excudeService()")
     public Object doAround(ProceedingJoinPoint pjp) throws Throwable {
-    	long time1=System.currentTimeMillis();	
+    	long time1=System.currentTimeMillis();
         Object result = pjp.proceed();
         long time2=System.currentTimeMillis();
         log.debug("获取JSON数据 耗时："+(time2-time1)+"ms");
         long start=System.currentTimeMillis();
-        result=this.parseDictText(result);
+        MethodSignature methodSignature = (MethodSignature) pjp.getSignature();
+        boolean autoDict = methodSignature.getMethod().getAnnotation(AutoDict.class) != null;
+        result=this.parseDictText(result, autoDict);
         long end=System.currentTimeMillis();
         log.debug("注入字典到JSON数据  耗时"+(end-start)+"ms");
         return result;
@@ -93,7 +99,7 @@ public class DictAspect {
      *             目前vue是这么进行字典渲染到table上的多了就很麻烦了 这个直接在服务端渲染完成前端可以直接用
      * @param result
      */
-    private Object parseDictText(Object result) {
+    private Object parseDictText(Object result, boolean autoDict) {
         //if (result instanceof Result) {
         if (true) {
             if (((Result) result).getResult() instanceof IPage) {
@@ -148,6 +154,21 @@ public class DictAspect {
                             dataList = dataListMap.computeIfAbsent(dictCode, k -> new ArrayList<>());
                             this.listAddAllDeduplicate(dataList, Arrays.asList(value.split(",")));
                         }
+                        // 递归处理嵌套 List 字段的字典翻译（需标注 @NestedDict）
+                        if (
+							List.class.isAssignableFrom(field.getType())
+							&& field.isAnnotationPresent(NestedDict.class)
+                        ) {
+                            try {
+                                field.setAccessible(true);
+                                Object listVal = field.get(record);
+                                if (listVal instanceof List<?> list && !list.isEmpty()) {
+                                    item.put(field.getName(), this.translateDictRecords(list));
+                                }
+                            } catch (Exception e) {
+                                log.warn("NestedDict translate failed: " + field.getName(), e);
+                            }
+                        }
                         //date类型默认转换string格式化日期
                         //if (JAVA_UTIL_DATE.equals(field.getType().getName())&&field.getAnnotation(JsonFormat.class)==null&&item.get(field.getName())!=null){
                             //SimpleDateFormat aDate=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -197,10 +218,37 @@ public class DictAspect {
                 }
 
                 ((IPage) ((Result) result).getResult()).setRecords(items);
+            } else if(autoDict) {
+	            if (((Result) result).getResult() instanceof List<?> records) {
+		            Boolean hasDict = checkHasDict(records);
+		            if(!hasDict){
+			            return result;
+		            }
+		            ((Result) result).setResult(this.translateDictRecords(records));
+	            } else if (((Result) result).getResult() != null) {
+		            Object record = ((Result) result).getResult();
+		            List<Object> records = Collections.singletonList(record);
+		            Boolean hasDict = checkHasDict(records);
+		            if(!hasDict){
+			            return result;
+		            }
+		            List<Object> translatedRecords = this.translateDictRecords(records);
+		            if(oConvertUtils.isNotEmpty(translatedRecords)){
+			            ((Result) result).setResult(translatedRecords.get(0));
+		            }
+	            }
             }
 
         }
         return result;
+    }
+
+    private List<Object> translateDictRecords(List<?> records) {
+        Page<Object> page = new Page<>(1, records.size());
+        page.setRecords(new ArrayList<>(records));
+        Result<IPage<Object>> pageResult = Result.ok(page);
+        this.parseDictText(pageResult, false);
+        return pageResult.getResult().getRecords();
     }
 
     /**
@@ -280,12 +328,12 @@ public class DictAspect {
                 }
                 log.debug("translateDictFromTableByKeys.dictCode:" + dictCode);
                 log.debug("translateDictFromTableByKeys.values:" + values);
-                
+
                 // 代码逻辑说明: 微服务下为空报错没有参数需要传递空字符串---
                 if(null == dataSource){
                     dataSource = "";
                 }
-                
+
                 List<DictModel> texts = commonApi.translateDictFromTableByKeys(table, text, code, values, dataSource);
                 log.debug("translateDictFromTableByKeys.result:" + texts);
                 List<DictModel> list = translText.computeIfAbsent(dictCode, k -> new ArrayList<>());
@@ -422,10 +470,13 @@ public class DictAspect {
      * @param records
      * @return
      */
-    private Boolean checkHasDict(List<Object> records){
+    private Boolean checkHasDict(List<?> records){
         if(oConvertUtils.isNotEmpty(records) && records.size()>0){
             for (Field field : oConvertUtils.getAllFields(records.get(0))) {
-                if (oConvertUtils.isNotEmpty(field.getAnnotation(Dict.class))) {
+                if (
+					oConvertUtils.isNotEmpty(field.getAnnotation(Dict.class))
+					|| oConvertUtils.isNotEmpty(field.getAnnotation(NestedDict.class))
+                ) {
                     return true;
                 }
             }
