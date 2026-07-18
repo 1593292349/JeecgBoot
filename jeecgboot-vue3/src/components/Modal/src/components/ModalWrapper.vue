@@ -1,17 +1,23 @@
 <template>
-  <ScrollContainer ref="wrapperRef">
-    <div ref="spinRef" :style="spinStyle" v-loading="loading" :loading-tip="loadingTip">
+  <ScrollContainer
+    v-bind="$attrs"
+    :style="spinStyle"
+    ref="wrapperRef"
+    @resize="$emit('height-change', $event.height)"
+    @scroll-resize="scrollSize = $event"
+  >
+    <div ref="spinRef" v-loading="loading" :loading-tip="loadingTip">
       <slot></slot>
     </div>
   </ScrollContainer>
 </template>
 <script lang="ts">
+  import type { SizeObject } from '/@/custom/components/ResizeObserver/type';
   import type { CSSProperties } from 'vue';
-  import { defineComponent, computed, ref, watchEffect, unref, watch, onMounted, nextTick, onUnmounted } from 'vue';
-  import { useWindowSizeFn } from '/@/hooks/event/useWindowSizeFn';
+  import { defineComponent, computed, ref, shallowRef, unref, onMounted, nextTick } from 'vue';
   import { ScrollContainer } from '/@/components/Container';
   import { createModalContext } from '../hooks/useModalContext';
-  import { useMutationObserver } from '@vueuse/core';
+  import useWindowSize from '/@/custom/composables/useWindowSize/index';
 
   const props = {
     loading: { type: Boolean },
@@ -25,6 +31,7 @@
     visible: { type: Boolean },
     fullScreen: { type: Boolean },
     loadingTip: { type: String },
+    uid: { type: String, default: '' },
   };
 
   export default defineComponent({
@@ -34,117 +41,39 @@
     props,
     emits: ['height-change', 'ext-height'],
     setup(props, { emit }) {
+      const { windowSize } = useWindowSize({});
+      const scrollSize = shallowRef<SizeObject>();
       const wrapperRef = ref<ComponentRef>(null);
       const spinRef = ref<ElRef>(null);
-      const realHeightRef = ref(0);
-      const minRealHeightRef = ref(0);
-
-      let realHeight = 0;
-
-      let stopElResizeFn: Fn = () => {};
-
-      useWindowSizeFn(setModalHeight.bind(null, false));
-
-      // 代码逻辑说明: 【TV360X-145】将弹窗还原全屏后，关闭再打开窗口变小了
-      let observer,
-        recordCount: any = {};
-      watch(
-        () => props.visible,
-        () => {
-          if (props.visible && !observer && !(props.maxHeight || props.height)) {
-            recordCount = {};
-            observer = useMutationObserver(
-              spinRef,
-              () => {
-                setModalHeight({
-                  source: 'muob',
-                  callBack: (height) => {
-                    const count = recordCount[height];
-                    if (count) {
-                      recordCount[height] = ++recordCount[height];
-                      if (count > 10) {
-                        observer.stop();
-                        recordCount = {};
-                        observer = null;
-                      }
-                    } else {
-                      recordCount = {};
-                      recordCount[height] = 1;
-                    }
-                  },
-                });
-              },
-              {
-                attributes: true,
-                subtree: true,
-              }
-            );
-          } else {
-            if (observer) {
-              observer.stop();
-              observer = null;
-            }
-          }
-        },
-        { immediate: true }
-      );
 
       createModalContext({
         redoModalHeight: setModalHeight,
+        uid: props.uid,
       });
 
       const spinStyle = computed((): CSSProperties => {
         // 代码逻辑说明: 【QQYUN-7147】Model的高度设置不生效
         if (props.fullScreen) {
           return {
-            height: `${unref(realHeightRef)}px`,
+            height: `${windowSize.height - props.modalFooterHeight - props.modalHeaderHeight}px`,
           };
         } else {
-          const defaultMiniHeight = 200;
+          const style: CSSProperties = {
+            minHeight: `${props.minHeight ?? 200}px`,
+            maxHeight: `${props.maxHeight}px`,
+          };
           if (props.height != undefined) {
-            let height: number = props.height;
-            if (props.minHeight === null) {
-              return {
-                height: `${height}px`,
-              };
-            } else {
-              return {
-                height: `${props.minHeight > height ? props.minHeight : height}px`,
-              };
-            }
-          } else {
-            return {
-              minHeight: `${props.minHeight === null ? defaultMiniHeight : props.minHeight}px`,
-              // 代码逻辑说明: 【QQYUN-7641】basicModal组件添加MaxHeight属性
-              maxHeight: `${props.maxHeight ? props.maxHeight : unref(realHeightRef)}px`,
-            };
+            style.height = `${props.height}px`;
+          } else if (scrollSize.value) {
+            style.height = `${scrollSize.value.height}px`;
           }
+          return style;
         }
       });
-
-      watchEffect(() => {
-        props.useWrapper && setModalHeight();
-      });
-
-      watch(
-        () => props.fullScreen,
-        (v) => {
-          setModalHeight();
-          if (!v) {
-            realHeightRef.value = minRealHeightRef.value;
-          } else {
-            minRealHeightRef.value = realHeightRef.value;
-          }
-        }
-      );
 
       onMounted(() => {
         const { modalHeaderHeight, modalFooterHeight } = props;
         emit('ext-height', modalHeaderHeight + modalFooterHeight);
-      });
-
-      onUnmounted(() => {
-        stopElResizeFn && stopElResizeFn();
       });
 
       async function scrollTop() {
@@ -156,59 +85,9 @@
       }
 
       async function setModalHeight(option?) {
-        console.log("---------性能监控--------setModalHeight----------")
-        const options = option || {};
-        const source = options.source;
-        const callBack = options.callBack;
-        // 解决在弹窗关闭的时候监听还存在,导致再次打开弹窗没有高度
-        // 加上这个,就必须在使用的时候传递父级的visible
-        if (!props.visible) return;
-        const wrapperRefDom = unref(wrapperRef);
-        if (!wrapperRefDom) return;
-        // 代码逻辑说明: 【QQYUN-8573】BasicModal组件在非全屏的情况下最大高度获取异常，不论内容高度是否超出屏幕高度，都等于内容高度
-        const bodyDom = wrapperRefDom.$el.parentElement?.parentElement?.parentElement;
-        if (!bodyDom) return;
-        // bodyDom.style.padding = '0';
-        await nextTick();
-
-        try {
-          const modalDom = bodyDom.parentElement && bodyDom.parentElement.parentElement;
-          if (!modalDom) return;
-
-          const modalRect = getComputedStyle(modalDom as Element).top;
-          const modalTop = Number.parseInt(modalRect);
-          let maxHeight = window.innerHeight - modalTop * 2 + (props.footerOffset! || 0) - props.modalFooterHeight - props.modalHeaderHeight;
-
-          // 距离顶部过进会出现滚动条
-          if (modalTop < 40) {
-            maxHeight -= 26;
-          }
-          await nextTick();
-          const spinEl = unref(spinRef);
-
-          if (!spinEl) return;
-          await nextTick();
-          // if (!realHeight) {
-          realHeight = spinEl.scrollHeight;
-          // }
-
-          if (props.fullScreen) {
-            realHeightRef.value = window.innerHeight - props.modalFooterHeight - props.modalHeaderHeight - 28;
-          } else {
-            realHeightRef.value = props.height ? props.height : realHeight > maxHeight ? maxHeight : realHeight;
-          }
-          // 代码逻辑说明: 【QQYUN-9035】basicModal不设置maxHeight或height会一直执行setModalHeight，需即使销毁MutationObserver
-          if (source == 'muob') {
-            callBack(realHeightRef.value);
-          }
-          
-          emit('height-change', unref(realHeightRef));
-        } catch (error) {
-          console.log(error);
-        }
       }
 
-      return { wrapperRef, spinRef, spinStyle, scrollTop, setModalHeight };
+      return { scrollSize, wrapperRef, spinRef, spinStyle, scrollTop, setModalHeight };
     },
   });
 </script>

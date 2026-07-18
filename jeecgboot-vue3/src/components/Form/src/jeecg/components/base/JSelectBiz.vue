@@ -15,6 +15,7 @@
           v-else
           ref="select"
           v-model:value="selectValues.value"
+          :showSearch="false"
           :placeholder="placeholder"
           :mode="multiple"
           :open="false"
@@ -29,7 +30,7 @@
           <template v-if="isCustomRenderTag" #tagRender="{ label, value, option}">
             <a-tag class="ant-select-selection-item" style="margin-right: 4px">
               <span class="ant-select-selection-item-content" style="font-size: 14px;max-width: 300px" :title="tagRender(label, value, false)">{{ tagRender(label, value, true) }}</span>
-              <span class="ant-select-selection-item-remove">
+              <span v-if="!disabled" class="ant-select-selection-item-remove">
                 <Icon icon="ant-design:close-outlined" size="12" @click="handleRemoveClick(value)"></Icon>
               </span>
             </a-tag>
@@ -94,7 +95,7 @@
 
       //存放部门名称
       const departNamePath = ref<Record<string, string>>({});
-      
+
       /**
        * 打开弹出框
        */
@@ -115,7 +116,7 @@
         selectValues.change = true;
         emit('change', value);
       }
-      
+
       /**
        * 多选tag自定义渲染
        *
@@ -154,7 +155,7 @@
 
       /**
        * tag删除
-       * 
+       *
        * @param value
        */
       function handleRemoveClick(value) {

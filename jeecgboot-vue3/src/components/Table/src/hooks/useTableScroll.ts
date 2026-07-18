@@ -1,8 +1,7 @@
 import type { BasicTableProps, TableRowSelection, BasicColumn } from '../types/table';
 import type { Ref, ComputedRef, Slots } from 'vue';
-import { computed, unref, ref, nextTick, watch } from 'vue';
+import { computed, unref, ref, shallowRef, nextTick, watch } from 'vue';
 import { getViewportOffset } from '/@/utils/domUtils';
-import { isBoolean } from '/@/utils/is';
 import { useWindowSizeFn } from '/@/hooks/event/useWindowSizeFn';
 import { useModalContext } from '/@/components/Modal';
 import { onMountedOrActivated } from '/@/hooks/core/onMountedOrActivated';
@@ -16,8 +15,29 @@ export function useTableScroll(
   rowSelectionRef: ComputedRef<TableRowSelection<any> | null>,
   getDataSourceRef: ComputedRef<Recordable[]>,
   slots: Slots,
-  getPaginationInfo: ComputedRef<any>
+  getPaginationInfo: ComputedRef<any>,
+  fullHeight: Ref<number>,
 ) {
+  const fixHeight = shallowRef(0);
+  watch(
+    () => {
+      if (propsRef.value.height && fullHeight.value) {
+        return propsRef.value.height - fullHeight.value;
+      }
+      return 0;
+    },
+    (diff) => {
+      if (diff) {
+        if (fixHeight.value) {
+          fixHeight.value += diff;
+        } else {
+          fixHeight.value = diff;
+        }
+        calcTableHeight();
+      }
+    }
+  );
+
   const tableHeightRef: Ref<Nullable<number>> = ref(null);
 
   const modalFn = useModalContext();
@@ -59,7 +79,6 @@ export function useTableScroll(
 
   async function calcTableHeight() {
     const { resizeHeightOffset, pagination, maxHeight, minHeight } = unref(propsRef);
-    const tableData = unref(getDataSourceRef);
 
     const table = unref(tableElRef);
     if (!table) return;
@@ -90,7 +109,7 @@ export function useTableScroll(
 
     bodyEl!.style.height = 'unset';
 
-    if (!unref(getCanResize) || ( !tableData || tableData.length === 0)) return;
+    if (!unref(getCanResize)) return;
 
     await nextTick();
     //Add a delay to get the correct bottomIncludeBody paginationHeight footerHeight headerHeight
@@ -148,37 +167,17 @@ export function useTableScroll(
     } catch (e) {}
     height = (height < minHeight! ? (minHeight as number) : height) ?? height;
     height = (height > maxHeight! ? (maxHeight as number) : height) ?? height;
+    if (propsRef.value.height) {
+      height = fixHeight.value;
+    }
     setHeight(height);
 
     bodyEl!.style.height = `${height}px`;
-    // update-begin--author:liaozhiyang---date:20240609---for【issues/8374】分页始终显示在底部
-    nextTick(() => {
-      if (maxHeight === undefined) {
-        if (unref(getPaginationInfo) && unref(getDataSourceRef).length) {
-          const pageSize = unref(getPaginationInfo)?.pageSize;
-          const current = unref(getPaginationInfo)?.current;
-          const total = unref(getPaginationInfo)?.total;
-          const tableBody = tableEl.querySelector('.ant-table-body') as HTMLElement;
-          const tr = tableEl.querySelector('.ant-table-tbody')?.children ?? [];
-          const lastrEl = tr[tr.length - 1] as HTMLElement;
-          const trHeight = lastrEl.offsetHeight;
-          const dataHeight = trHeight * pageSize;
-          if (tableBody && lastrEl) {
-            // table是否隐藏（隐藏的table不能吸底）
-            const isTableBodyHide = tableBody.offsetHeight == 0 && tableBody.offsetWidth == 0;
-            if (isTableBodyHide) {
-              return;
-            }
-            if (current === 1 && pageSize > unref(getDataSourceRef).length && total <= pageSize) {
-              tableBody.style.height = `${height}px`;
-            } else {
-              tableBody.style.height = `${dataHeight < height ? dataHeight : height}px`;
-            }
-          }
-        }
-      }
-    });
-    // update-end--author:liaozhiyang---date:20240609---for【issues/8374】分页始终显示在底部
+
+    const tableBody = tableEl.querySelector('.ant-table-body') as HTMLElement;
+    if(tableBody){
+      tableBody.style.height = `${height}px`;
+    }
   }
   useWindowSizeFn(calcTableHeight, 280);
   onMountedOrActivated(() => {

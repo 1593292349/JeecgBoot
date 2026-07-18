@@ -11,7 +11,7 @@
     :getPopupContainer="getParentContainer"
   >
     <template v-for="item of getOptions" :key="item.key">
-      <a-select-option :value="item.value" :getPopupContainer="getParentContainer">
+      <a-select-option :value="item.value" :disabled="item.disabled" :getPopupContainer="getParentContainer">
         <span :class="item.class" :style="item.style">{{ item.text }}</span>
       </a-select-option>
     </template>
@@ -96,6 +96,7 @@
             key: key,
             text: text,
             value: item.value,
+            disabled: item.disabled,
             color: item.color,
             class: [useDicColor && item.color ? 'colorText' : ''],
             style: {backgroundColor: `${useDicColor && item.color}`},
