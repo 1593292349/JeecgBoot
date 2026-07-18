@@ -25,7 +25,7 @@ LayoutMap.set('LayoutsContent', LayoutContent);
 let dynamicViewsModules: Record<string, () => Promise<Recordable>>;
 
 // Dynamic introduction
-function asyncImportRoute(routes: AppRouteRecordRaw[] | undefined) {
+function asyncImportRoute(routes: AppRouteRecordRaw[] | undefined, parent?: AppRouteRecordRaw) {
   if (!dynamicViewsModules) {
     dynamicViewsModules = import.meta.glob('../../views/**/*.{vue,tsx}');
     //合并online lib路由
@@ -48,6 +48,9 @@ function asyncImportRoute(routes: AppRouteRecordRaw[] | undefined) {
       item.meta.hideMenu = true;
       //是否隐藏面包屑
       item.meta.hideBreadcrumb = true;
+      if (parent) {
+        item.meta.currentActiveMenu = parent.meta.currentActiveMenu || parent.path;
+      }
     }
     // @ts-ignore 添加忽略路由配置
     if (item?.route == 0) {
@@ -97,7 +100,7 @@ function asyncImportRoute(routes: AppRouteRecordRaw[] | undefined) {
     } else if (name) {
       item.component = getParentLayout();
     }
-    children && asyncImportRoute(children);
+    children && asyncImportRoute(children, item);
   });
 }
 

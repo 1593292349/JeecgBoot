@@ -19,6 +19,7 @@
     <a-row class="jeecg-modal-wrapper">
       <a-col :span="24-commentSpan" class="jeecg-modal-content">
         <ModalWrapper
+          :uid="uid"
           :useWrapper="getProps.useWrapper"
           :footerOffset="wrapperFooterOffset"
           :fullScreen="fullScreenRef"
@@ -29,30 +30,35 @@
           :maxHeight="getProps.maxHeight"
           :height="getWrapperHeight"
           :visible="visibleRef"
-          :modalHeaderHeight="getProps.modalHeaderHeight"
-          :modalFooterHeight="footer !== undefined && !footer ? 0 : getProps.modalFooterHeight"
+          :modalHeaderHeight="headerHeight"
+          :modalFooterHeight="footerHeight"
           v-bind="omit(getProps.wrapperProps, 'visible', 'height', 'modalFooterHeight')"
+          @resize="handleResize"
           @ext-height="handleExtHeight"
-          @height-change="handleHeightChange">
-          <slot></slot>
+        >
+          <slot
+            :fullScreen="fullScreenRef"
+            :containerSize="containerSize"
+          ></slot>
         </ModalWrapper>
       </a-col>
-      
+
       <a-col :span="commentSpan" class="jeecg-comment-outer">
         <slot name="comment"></slot>
       </a-col>
-      
+
     </a-row>
-    
+
     <template #[item]="data" v-for="item in Object.keys(omit($slots, 'default'))">
       <slot :name="item" v-bind="data || {}"></slot>
     </template>
   </Modal>
 </template>
 <script lang="ts">
+  import type { SizeObject } from '/@/custom/components/ResizeObserver/type';
   import type { ModalProps, ModalMethods } from './typing';
 
-  import { defineComponent, computed, ref, watch, unref, watchEffect, toRef, getCurrentInstance, nextTick } from 'vue';
+  import { defineComponent, computed, ref, shallowRef, watch, unref, watchEffect, toRef, getCurrentInstance, nextTick } from 'vue';
   import Modal from './components/Modal';
   import ModalWrapper from './components/ModalWrapper.vue';
   import ModalClose from './components/ModalClose.vue';
@@ -65,8 +71,10 @@
   import { omit } from 'lodash-es';
   import { useDesign } from '/@/hooks/web/useDesign';
   import { useAppInject } from '/@/hooks/web/useAppInject';
+  import useWindowSize from '/@/custom/composables/useWindowSize/index';
 
 
+  let gid = 0;
   export default defineComponent({
     name: 'BasicModal',
     components: { Modal, ModalWrapper, ModalClose, ModalFooter, ModalHeader },
@@ -74,6 +82,8 @@
     props: basicProps,
     emits: ['visible-change', 'open-change', 'height-change', 'cancel', 'ok', 'register', 'update:visible', 'update:open', 'fullScreen','comment-open'],
     setup(props, { emit, attrs , slots}) {
+      gid = (gid + 1) % Number.MAX_SAFE_INTEGER;
+      const uid = `uid-${gid}`;
       const visibleRef = ref(false);
       const propsRef = ref<Partial<ModalProps> | null>(null);
       const modalWrapperRef = ref<any>(null);
@@ -123,15 +133,35 @@
         wrapClassName: toRef(getMergeProps.value, 'wrapClassName'),
       });
 
+      const { windowSize } = useWindowSize({});
+      const headerHeight = computed(() => {
+        return getMergeProps.value.modalHeaderHeight ?? 57;
+      });
+      const footerHeight = computed(() => {
+        const { footer, modalFooterHeight } = getMergeProps.value;
+        return footer !== undefined && !footer ? 0 : (modalFooterHeight ?? 49);
+      });
+      const fullHeight = computed(() => {
+        return windowSize.height - headerHeight.value - footerHeight.value;
+      });
+      const containerSize = shallowRef<SizeObject>({
+        width: 0,
+        height: 0,
+      });
+
       // modal component does not need title and origin buttons
       const getProps = computed((): Recordable => {
-        const opt = {
+        const opt: Record<string, unknown> = {
           ...unref(getMergeProps),
           visible: unref(visibleRef),
           okButtonProps: undefined,
           cancelButtonProps: undefined,
           title: undefined,
         };
+        const availableHeight = fullHeight.value - 30;
+        if (typeof opt.maxHeight !== 'number' || opt.maxHeight > availableHeight) {
+          opt.maxHeight = availableHeight;
+        }
         return {
           ...opt,
           wrapClassName: unref(getWrapClassName),
@@ -144,7 +174,10 @@
           ...attrs,
           ...unref(getMergeProps),
           open: unref(visibleRef),
-          wrapClassName: unref(getWrapClassName),
+          wrapClassName: unref(getWrapClassName) + ` ${uid}`,
+          style: {
+            top: `${(fullHeight.value - containerSize.value.height) / 2}px`,
+          },
         };
         if (unref(fullScreenRef)) {
           return omit(attr, ['height', 'title', 'visible']);
@@ -232,8 +265,9 @@
         emit('ok', e);
       }
 
-      function handleHeightChange(height: string) {
-        emit('height-change', height);
+      function handleResize(size: SizeObject) {
+        containerSize.value = size;
+        emit('height-change', size.height);
       }
 
       function handleExtHeight(height: number) {
@@ -267,6 +301,10 @@
       });
 
       return {
+        uid,
+        containerSize,
+        headerHeight,
+        footerHeight,
         handleCancel,
         getBindValue,
         getProps,
@@ -278,7 +316,7 @@
         omit,
         modalWrapperRef,
         handleExtHeight,
-        handleHeightChange,
+        handleResize,
         handleTitleDbClick,
         getWrapperHeight,
         commentSpan,
@@ -299,7 +337,7 @@
   .jeecg-modal-content{
     >.scroll-container{
       // 代码逻辑说明: 【QQYUN-7297】表单讨论弹窗放大按钮时只显示一部分---
-      padding: 6px;
+      //padding: 6px;
     }
   }
   /*update-end-author:taoyan date:2022-7-27 for:modal评论区域样式*/

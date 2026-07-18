@@ -1,5 +1,9 @@
 <template>
-  <div ref="wrapRef" :class="getWrapperClass">
+  <ResizeObserver
+    :class="getWrapperClass"
+    @resize="containerResize"
+    @ref:root="wrapRef = $event"
+  >
     <BasicForm
       :class="{ 'table-search-area-hidden': !getBindValues.formConfig?.schemas?.length }"
       submitOnReset
@@ -53,16 +57,18 @@
         </Table>
       </a-form-item>
     </a-form-item-rest>
-  </div>
+  </ResizeObserver>
 </template>
 <script lang="ts">
+  import type { SizeObject } from '/@/custom/components/ResizeObserver/type';
   import type { BasicTableProps, TableActionType, SizeType, ColumnChangeParam, BasicColumn } from './types/table';
 
-  import { defineComponent, ref, computed, unref, toRaw, inject, watchEffect, watch, onUnmounted, onMounted, nextTick } from 'vue';
+  import { defineComponent, ref, shallowRef, computed, unref, toRaw, inject, watchEffect, nextTick } from 'vue';
   import { Table } from 'ant-design-vue';
   import { BasicForm, useForm } from '/@/components/Form/index';
   import { PageWrapperFixedHeightKey } from '/@/components/Page/injectionKey';
   import CustomSelectHeader from './components/CustomSelectHeader.vue'
+  import ResizeObserver from '/@/custom/components/ResizeObserver/index.vue';
   import expandIcon from './components/ExpandIcon';
   import HeaderCell from './components/HeaderCell.vue';
   import TableSummary from './components/TableSummary';
@@ -95,6 +101,7 @@
       HeaderCell,
       TableSummary,
       CustomSelectHeader,
+      ResizeObserver,
     },
     props: basicProps,
     emits: [
@@ -117,6 +124,11 @@
       'table-redo',
     ],
     setup(props, { attrs, emit, slots, expose }) {
+      const fullHeight = shallowRef(0);
+      function containerResize({ height }: SizeObject) {
+        fullHeight.value = height;
+      }
+
       const tableElRef = ref(null);
       const tableData = ref<Recordable[]>([]);
 
@@ -212,7 +224,16 @@
         handleCustomSelectColumn,
       );
 
-      const { getScrollRef, redoHeight } = useTableScroll(getProps, tableElRef, getColumnsRef, getRowSelectionRef, getDataSourceRef, slots, getPaginationInfo);
+      const { getScrollRef, redoHeight } = useTableScroll(
+        getProps,
+        tableElRef,
+        getColumnsRef,
+        getRowSelectionRef,
+        getDataSourceRef,
+        slots,
+        getPaginationInfo,
+        fullHeight,
+      );
 
       const { customRow } = useCustomRow(getProps, {
         setSelectedRowKeys,
@@ -403,6 +424,7 @@
 
 
       return {
+        containerResize,
         tableElRef,
         getBindValues,
         getLoading,

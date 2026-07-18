@@ -22,7 +22,7 @@ export function useForm(props?: Props): UseFormReturnType {
   add("OnlineSelectCascade", OnlineSelectCascade)
   add("LinkTableCard", LinkTableCard)
   add("LinkTableSelect", LinkTableSelect)
-  
+
   async function getForm() {
     const form = unref(formRef);
     if (!form) {
@@ -88,6 +88,10 @@ export function useForm(props?: Props): UseFormReturnType {
 
     removeSchemaByFiled: async (field: string | string[]) => {
       unref(formRef)?.removeSchemaByFiled(field);
+    },
+
+    getFormModel() {
+      return unref(formRef)?.getFormModel();
     },
 
     // TODO promisify
