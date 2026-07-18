@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <trees>
+	 <tree path="/jeecgboot-vue3/src/custom" title="自定义工具"/>
+	 <tree path="/jeecgboot-vue3/src/ant-design-vue" title="增强第三方组件"/>
+	 <tree path="/jeecg-boot/jeecg-module-system/jeecg-system-biz/src/main/resources/jeecg/code-template-online/default"
+			 title="模板代码"/>
+	 <tree path="/jeecg-boot/jeecg-boot-module/jeecg-module-business" title="业务模块"/>
+	 <tree path="/jeecgboot-vue3/src/views/business" title="业务模块"/>
+ </trees>
