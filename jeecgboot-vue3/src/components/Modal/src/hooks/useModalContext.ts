@@ -3,6 +3,7 @@ import { createContext, useContext } from '/@/hooks/core/useContext';
 
 export interface ModalContextProps {
   redoModalHeight: () => void;
+  uid: string;
 }
 
 const key: InjectionKey<ModalContextProps> = Symbol();
