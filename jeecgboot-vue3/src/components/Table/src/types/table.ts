@@ -225,6 +225,8 @@ export interface BasicTableProps<T = any> {
   minHeight?: number;
   // 表格滚动最大高度
   maxHeight?: number;
+  //固定高度
+  height?: number;
   // 是否显示边框
   bordered?: boolean;
   // 展开列宽度

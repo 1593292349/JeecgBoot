@@ -1,15 +1,20 @@
 <template>
-  <div class="scrollbar">
+  <ResizeObserver class="scrollbar">
     <div ref="wrap" :class="[wrapClass, 'scrollbar__wrap', native ? '' : 'scrollbar__wrap--hidden-default']" :style="style" @scroll="handleScroll">
-      <component :is="tag" ref="resize" :class="['scrollbar__view', viewClass]" :style="viewStyle">
-        <slot></slot>
-      </component>
+      <ResizeObserver
+        class="scrollbar__resize"
+        @resize="$emit('scroll-resize', $event)"
+      >
+        <component :is="tag" ref="resize" :class="['scrollbar__view', viewClass]" :style="viewStyle">
+          <slot></slot>
+        </component>
+      </ResizeObserver>
     </div>
     <template v-if="!native">
       <bar :move="moveX" :size="sizeWidth" />
       <bar vertical :move="moveY" :size="sizeHeight" />
     </template>
-  </div>
+  </ResizeObserver>
 </template>
 <script lang="ts">
   import { addResizeListener, removeResizeListener } from '/@/utils/event';
@@ -18,11 +23,13 @@
   import { toObject } from './util';
   import { defineComponent, ref, onMounted, onBeforeUnmount, nextTick, provide, computed, unref } from 'vue';
   import Bar from './bar';
+  import ResizeObserver from '/@/custom/components/ResizeObserver/index.vue';
 
   export default defineComponent({
     name: 'Scrollbar',
     // inheritAttrs: false,
-    components: { Bar },
+    components: { Bar, ResizeObserver },
+    emits: ['scroll-resize'],
     props: {
       native: {
         type: Boolean,
@@ -181,6 +188,20 @@
           height: 100%;
         }
       }
+    }
+  }
+
+  // 内容包裹层：老浏览器回退 inline-block，支持 flow-root 的用 flow-root
+  // 两者都建立 BFC；vertical-align: top 消除 inline-block 基线以下的行盒空隙（假滚动条）
+  .scrollbar__resize {
+    display: inline-block;
+    vertical-align: top;
+    width: 100%;
+  }
+
+  @supports (display: flow-root) {
+    .scrollbar__resize {
+      display: flow-root;
     }
   }
 

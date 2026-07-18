@@ -9,11 +9,14 @@ import { omit } from 'lodash-es';
 export default defineComponent({
   name: 'Modal',
   inheritAttrs: false,
-  props: omit(basicProps, ['visible']),
+  props: omit(basicProps, ['visible', 'height']),
   emits: ['cancel'],
   setup(props, { slots, emit }) {
     const { open, draggable, destroyOnClose } = toRefs(props);
-    const attrs = useAttrs();
+    const attrs = useAttrs({
+      excludeDefaultKeys: false,
+      excludeKeys: ['height'],
+    });
     useModalDragMove({
       visible: open,
       destroyOnClose,
