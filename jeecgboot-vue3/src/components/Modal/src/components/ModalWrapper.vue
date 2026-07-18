@@ -25,6 +25,7 @@
     visible: { type: Boolean },
     fullScreen: { type: Boolean },
     loadingTip: { type: String },
+    uid: { type: String, default: '' },
   };
 
   export default defineComponent({
@@ -91,6 +92,7 @@
 
       createModalContext({
         redoModalHeight: setModalHeight,
+        uid: props.uid,
       });
 
       const spinStyle = computed((): CSSProperties => {
@@ -201,7 +203,7 @@
           if (source == 'muob') {
             callBack(realHeightRef.value);
           }
-          
+
           emit('height-change', unref(realHeightRef));
         } catch (error) {
           console.log(error);

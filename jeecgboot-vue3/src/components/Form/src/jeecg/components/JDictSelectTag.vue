@@ -88,6 +88,10 @@
         default: [],
         required: false,
       },
+      optionsFilter:{
+        type: Function,
+        required: false,
+      },
       style: propTypes.any,
       // 搜索时是否只搜索label
       onlySearchByLabel: propTypes.bool.def(false),
@@ -137,9 +141,12 @@
       );
 
       async function initDictData() {
-        let { dictCode, stringToNumber } = props;
+        let { dictCode, stringToNumber, optionsFilter } = props;
         //根据字典Code, 初始化字典数组
-        const dictData = await initDictOptions(dictCode);
+        let dictData = await initDictOptions(dictCode);
+        if(optionsFilter){
+          dictData = dictData.filter(optionsFilter);
+        }
         dictOptions.value = dictData.reduce((prev, next) => {
           if (next) {
             const value = next['value'];
@@ -158,7 +165,7 @@
         const { mode } = unref<Recordable>(getBindValue);
         let changeValue:any;
         // 兼容多选模式
-        
+
         //采用一个值，不然的话state值变换触发多个change
         if (mode === 'multiple') {
           changeValue = e?.target?.value ?? e;
@@ -176,7 +183,7 @@
 
         // 代码逻辑说明: 【issues/4507】JDictSelectTag组件使用时，浏览器给出警告提示：Expected Function, got Array------------
         emit('update:value',changeValue)
-        
+
         // nextTick(() => formItemContext.onFieldChange());
       }
 
