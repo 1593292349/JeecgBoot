@@ -43,6 +43,14 @@ export function createVitePlugins(viteEnv: ViteEnv, isBuild: boolean, isQiankunM
     VitePluginCertificate({
       source: 'coding',
     }),
+    {
+      name: 'antd-replacer',
+      transform(code, id) {
+        if (!/src[/\\]ant-design-vue[/\\]/.test(id)) {
+          return code.replace(/from\s+(['"])ant-design-vue\1/g, `from '/@/ant-design-vue/index.ts'`)
+        }
+      }
+    },
   ];
 
   vitePlugins.push(UnoCSS({ presets: [presetUno(), presetTypography()] }));
@@ -79,7 +87,7 @@ export function createVitePlugins(viteEnv: ViteEnv, isBuild: boolean, isQiankunM
 
   // The following plugins only work in the production environment
   if (isBuild) {
-    
+
     // rollup-plugin-gzip
     vitePlugins.push(configCompressPlugin(VITE_BUILD_COMPRESS, VITE_BUILD_COMPRESS_DELETE_ORIGIN_FILE));
 

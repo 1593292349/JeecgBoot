@@ -1,7 +1,7 @@
 module.exports = {
   printWidth: 150,
-  tabWidth: 2,
-  useTabs: false,
+  tabWidth: 4,
+  useTabs: true,
   semi: true, //语句末尾使用分号
   vueIndentScriptAndStyle: true,
   singleQuote: true, // 使用单引号
@@ -17,4 +17,5 @@ module.exports = {
   htmlWhitespaceSensitivity: 'strict',
   endOfLine: 'auto', // 自动处理换行符（LF/CRLF）
   rangeStart: 0,
+  singleAttributePerLine: true,
 };

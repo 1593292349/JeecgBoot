@@ -19,6 +19,7 @@
     <a-row class="jeecg-modal-wrapper">
       <a-col :span="24-commentSpan" class="jeecg-modal-content">
         <ModalWrapper
+          :uid="uid"
           :useWrapper="getProps.useWrapper"
           :footerOffset="wrapperFooterOffset"
           :fullScreen="fullScreenRef"
@@ -37,13 +38,13 @@
           <slot></slot>
         </ModalWrapper>
       </a-col>
-      
+
       <a-col :span="commentSpan" class="jeecg-comment-outer">
         <slot name="comment"></slot>
       </a-col>
-      
+
     </a-row>
-    
+
     <template #[item]="data" v-for="item in Object.keys(omit($slots, 'default'))">
       <slot :name="item" v-bind="data || {}"></slot>
     </template>
@@ -67,6 +68,7 @@
   import { useAppInject } from '/@/hooks/web/useAppInject';
 
 
+  let gid = 0;
   export default defineComponent({
     name: 'BasicModal',
     components: { Modal, ModalWrapper, ModalClose, ModalFooter, ModalHeader },
@@ -74,6 +76,8 @@
     props: basicProps,
     emits: ['visible-change', 'open-change', 'height-change', 'cancel', 'ok', 'register', 'update:visible', 'update:open', 'fullScreen','comment-open'],
     setup(props, { emit, attrs , slots}) {
+      gid = (gid + 1) % Number.MAX_SAFE_INTEGER;
+      const uid = `uid-${gid}`;
       const visibleRef = ref(false);
       const propsRef = ref<Partial<ModalProps> | null>(null);
       const modalWrapperRef = ref<any>(null);
@@ -144,7 +148,7 @@
           ...attrs,
           ...unref(getMergeProps),
           open: unref(visibleRef),
-          wrapClassName: unref(getWrapClassName),
+          wrapClassName: unref(getWrapClassName) + ` ${uid}`,
         };
         if (unref(fullScreenRef)) {
           return omit(attr, ['height', 'title', 'visible']);
@@ -267,6 +271,7 @@
       });
 
       return {
+        uid,
         handleCancel,
         getBindValue,
         getProps,

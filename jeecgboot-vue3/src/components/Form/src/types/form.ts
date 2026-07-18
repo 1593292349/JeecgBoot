@@ -42,6 +42,7 @@ export interface FormActionType {
   validate: (nameList?: NamePath[]) => Promise<any>;
   scrollToField: (name: NamePath, options?: ScrollOptions) => Promise<void>;
   getSchemaComponentProps: (schema: FormSchema) => Recordable
+  getFormModel: () => Recordable | undefined;
 }
 
 export type RegisterFn = (formInstance: FormActionType) => void;
@@ -204,7 +205,7 @@ export interface FormSchema {
 
   // 这个属性自定义的 用于自定义的业务 比如在表单打开的时候修改表单的禁用状态，但是又不能重写componentProps，因为他的内容太多了，所以使用dynamicDisabled和buss实现
   buss?: any;
-  
+
   //label字数控制（label宽度）
   labelLength?: number;
   // update-begin--author:liaozhiyang---date:20240529---for【TV360X-460】basicForm支持v-auth指令(权限控制显隐)
