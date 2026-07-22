@@ -95,11 +95,11 @@ public class LoginController {
 		}
 
 		// step.2 验证码check
-        String realKey = validateCaptcha(sysLoginModel, result);
-        if (realKey == null) {
-            return result;
-        }
-		
+//        String realKey = validateCaptcha(sysLoginModel, result);
+//        if (realKey == null) {
+//            return result;
+//        }
+
 		// step.3 校验用户是否存在且有效
 		LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
 		queryWrapper.eq(SysUser::getUsername,username);
@@ -124,7 +124,7 @@ public class LoginController {
 		userInfo(sysUser, result, request, CommonConstant.CLIENT_TYPE_PC);
 
 		// step.6  登录成功删除验证码
-		redisUtil.del(realKey);
+//		redisUtil.del(realKey);
 		redisUtil.del(CommonConstant.LOGIN_FAIL + username);
 
 		// step.7 记录用户登录日志
